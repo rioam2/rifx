@@ -78,7 +78,7 @@ func (l *List) Filter(cb func(*Block) bool) *List {
 	return ret
 }
 
-// SublistFilter .
+// SublistFilter returns a slice of child lists that have the provided identifier
 func (l *List) SublistFilter(identifier string) []*List {
 	filtered := l.Filter(func(b *Block) bool {
 		return b.Type == "LIST" && b.Data.(*List).Identifier == identifier
