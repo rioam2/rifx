@@ -12,7 +12,7 @@ func FromReader(r io.Reader) (*List, error) {
 	b4 := make([]byte, 4)
 	io.ReadFull(r, b4)
 	if fmt.Sprintf("%s", b4) != "RIFX" {
-		return nil, fmt.Errorf("Unknown AEP file format")
+		return nil, fmt.Errorf("Unknown RIFX file format")
 	}
 	io.ReadFull(r, b4)
 	fileSize := binary.BigEndian.Uint32(b4)
