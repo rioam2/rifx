@@ -101,3 +101,17 @@ func (l *List) Find(cb func(*Block) bool) (*Block, error) {
 	}
 	return nil, fmt.Errorf("ENOTFOUND")
 }
+
+// SublistMerge filters sublists with the specified identifier and concatenates their blocks in a new list
+func (l *List) SublistMerge(identifier string) *List {
+	newList := &List{
+		Identifier: identifier,
+		Blocks:     make([]*Block, 0),
+		NumBlocks:  0,
+	}
+	for _, sublist := range l.SublistFilter(identifier) {
+		newList.Blocks = append(newList.Blocks, sublist.Blocks...)
+		newList.NumBlocks += sublist.NumBlocks
+	}
+	return newList
+}
