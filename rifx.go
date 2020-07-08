@@ -1,6 +1,7 @@
 package rifx
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -38,7 +39,7 @@ func readList(r io.Reader, limit uint32) (*List, uint32, error) {
 	// Read all blocks in the list up to byte limit
 	numBlocks := 0
 	for readBytes < limit {
-		block, n, err := readBlock(r)
+		block, n, err := readBlock(r, limit-readBytes)
 		readBytes += n
 		if err != nil {
 			return nil, readBytes, err
@@ -53,7 +54,7 @@ func readList(r io.Reader, limit uint32) (*List, uint32, error) {
 	return listBlock, readBytes, nil
 }
 
-func readBlock(r io.Reader) (*Block, uint32, error) {
+func readBlock(r io.Reader, limit uint32) (*Block, uint32, error) {
 	block := &Block{}
 	bytesRead := uint32(0)
 	b4 := make([]byte, 4)
@@ -74,29 +75,44 @@ func readBlock(r io.Reader) (*Block, uint32, error) {
 	}
 	block.Size = binary.BigEndian.Uint32(b4)
 
-	// Read the bock data
-	switch block.Type {
-	case "LIST":
-		group, n, err := readList(r, block.Size)
-		bytesRead += n
-		if err != nil {
-			return nil, bytesRead, err
-		}
-		block.Data = group
-	default:
-		blockData := make([]byte, block.Size)
-		n, err = io.ReadFull(r, blockData)
+	if block.Size > limit-bytesRead {
+		// Overflow, or malformed block... Try to recover by reading as an anonymous block
+		restData := make([]byte, limit-bytesRead)
+		n, err = io.ReadFull(r, restData)
 		bytesRead += uint32(n)
 		if err != nil {
 			return nil, bytesRead, err
 		}
-		block.Data = blockData
+		block.Data = bytes.Join([][]byte{[]byte(block.Type), b4, restData}, []byte{})
+		block.Type = "ANON"
+	} else {
+		// Read the bock data normally, and recurse on LISTS
+		switch block.Type {
+		case "LIST":
+			group, n, err := readList(r, block.Size)
+			bytesRead += n
+			if err != nil {
+				return nil, bytesRead, err
+			}
+			block.Data = group
+		default:
+			blockData := make([]byte, block.Size)
+			n, err = io.ReadFull(r, blockData)
+			bytesRead += uint32(n)
+			if err != nil {
+				return nil, bytesRead, err
+			}
+			block.Data = blockData
+		}
 	}
 
 	// Read padding if data is odd length
 	if (block.Size % 2) != 0 {
-		io.ReadFull(r, []byte{0})
-		bytesRead++
+		n, err = io.ReadFull(r, []byte{0})
+		bytesRead += uint32(n)
+		if err != nil {
+			return nil, bytesRead, err
+		}
 	}
 
 	return block, bytesRead, nil
