@@ -115,3 +115,13 @@ func (l *List) SublistMerge(identifier string) *List {
 	}
 	return newList
 }
+
+// SublistFind performs a basic find operation over a list's child list elements based on identifer
+func (l *List) SublistFind(identifier string) (*List, error) {
+	for _, block := range l.Blocks {
+		if block.Type == "LIST" && block.Data.(*List).Identifier == identifier {
+			return block.Data.(*List), nil
+		}
+	}
+	return nil, fmt.Errorf("No sublist with identifier %s exists", identifier)
+}
