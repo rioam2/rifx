@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"strings"
 )
 
 // Block represents a single block of binary data
@@ -20,7 +21,18 @@ func (b *Block) ToStruct(ptr interface{}) error {
 
 // ToString returns block data as a string
 func (b *Block) ToString() string {
-	return fmt.Sprintf("%s", b.Data.([]byte))
+	if data, ok := b.Data.([]byte); ok {
+		// Check for embedded block type
+		if len(data) >= 4 && strings.ToLower(fmt.Sprintf("%s", data[:4])) == "utf8" {
+			strLen := binary.BigEndian.Uint32(data[4:8])
+			if strLen+8 > b.Size {
+				return fmt.Sprintf("%s", bytes.Trim(data, "\x00"))
+			}
+			return fmt.Sprintf("%s", bytes.Trim(data[8:8+strLen], "\x00"))
+		}
+		return fmt.Sprintf("%s", bytes.Trim(data, "\x00"))
+	}
+	return ""
 }
 
 // ToUint8 returns block data as uint8
@@ -100,6 +112,13 @@ func (l *List) Find(cb func(*Block) bool) (*Block, error) {
 		}
 	}
 	return nil, fmt.Errorf("ENOTFOUND")
+}
+
+// FindByType performs a find operation over a list's blocks predicated upon block type
+func (l *List) FindByType(blockType string) (*Block, error) {
+	return l.Find(func(b *Block) bool {
+		return b.Type == blockType
+	})
 }
 
 // SublistMerge filters sublists with the specified identifier and concatenates their blocks in a new list
